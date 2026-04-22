@@ -71,12 +71,13 @@ class BankAgent:
         self.mandate_turns   = 0
         self.mandated_action = 3
         self.qe_bonus = 0.0
+        self.bankrupt = False
 
     def tier(self, pct):
         return 0 if pct < 0.25 else (1 if pct < 0.75 else 2)
 
     def eff_cap(self):
-        return self.capital + self.qe_bonus
+        return max(0, min(self.capital, INIT_CAPITAL)) + self.qe_bonus
 
     def get_state(self, agents, fed):
         own = self.liquid / max(self.eff_cap(), 1)
@@ -85,6 +86,7 @@ class BankAgent:
         return (self.tier(own), self.tier(avg), fed)
 
     def act(self, s):
+        if self.bankrupt: return 0
         if self.mandate_turns > 0:
             self.mandate_turns -= 1
             a = self.mandated_action
@@ -96,6 +98,11 @@ class BankAgent:
         return a
 
     def apply_action(self, a):
+        if self.bankrupt:
+            self.liquid = 0
+            self.illiquid = 0
+            self.capital = 0
+            return
         pct = ACTION_PCT[a]
         ec  = self.eff_cap()
         self.liquid   = ec * pct
@@ -301,15 +308,16 @@ def draw_left_panel(surf, player, agents, tool_rects, hovered_tool, fonts):
         tx(surf, BANK_NAMES[player.selected], fonts["sm"], GOLD, x+w//2, y+12)
         rr(surf, sc, (x+5, y+26, w-10, 17), 8)
         tx(surf, ACTION_LABELS[ag.last_action], fonts["xs"], BG, x+w//2, y+34)
-        tx(surf, f"L:{ag.liquid:.0f}  I:{ag.illiquid:.0f}", fonts["xs"], TEXT, x+w//2, y+50)
+        tx(surf, f"L:{ag.liquid:.0f}  I:{ag.illiquid:.0f}", fonts["xs"], TEXT, x+w//2, y+48)
+        tx(surf, f"C:{ag.capital:+.0f}", fonts["xs"], LIQ if ag.capital>0 else ILLIQ, x+w//2, y+58)
         cw = w-16
         coop = ag.coop_score
-        rr(surf, (20,32,58), (x+8, y+64, cw, 7), 3)
-        rr(surf, lc(ILLIQ,LIQ,coop), (x+8, y+64, int(cw*coop), 7), 3)
+        rr(surf, (20,32,58), (x+8, y+68, cw, 7), 3)
+        rr(surf, lc(ILLIQ,LIQ,coop), (x+8, y+68, int(cw*coop), 7), 3)
         if ag.mandate_turns > 0:
-            tx(surf, f"MANDATED {ag.mandate_turns}t", fonts["xs"], (100,180,255), x+w//2, y+78)
+            tx(surf, f"MANDATED {ag.mandate_turns}t", fonts["xs"], (100,180,255), x+w//2, y+82)
         else:
-            tx(surf, f"Coop {coop*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,coop), x+w//2, y+78)
+            tx(surf, f"Coop {coop*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,coop), x+w//2, y+82)
     else:
         tx(surf, "NO TARGET", fonts["xs"], DIM, x+w//2, y+18)
         tx(surf, "Click a bank or", fonts["xs"], DIM, x+w//2, y+36)
@@ -366,6 +374,14 @@ def draw_bank_col(surf, agent, idx, disp_liq, selected, active_turn, shocked, ba
 
     rr(surf, PANEL, (bx-10, by-10, BK_W+20, BK_H+20), 10)
 
+    if agent.bankrupt:
+        rr(surf, (50, 50, 50), (bx, by, BK_W, BK_H), 6)
+        tx(surf, "BANKRUPT", fonts["xs"], (200, 50, 50), cx, by+100)
+        tx(surf, BANK_NAMES[idx], fonts["sm"], DIM, cx, by+BK_H+14)
+        tx(surf, "L:0 I:0", fonts["xs"], DIM, cx, by+BK_H+30)
+        tx(surf, f"C:{agent.capital:+.0f}", fonts["xs"], (150, 50, 50), cx, by+BK_H+44)
+        return
+
     pct  = max(0.0, min(1.0, disp_liq / max(agent.eff_cap(), 1)))
     lh   = int(BK_H * pct)
     ih   = BK_H - lh
@@ -410,17 +426,18 @@ def draw_bank_col(surf, agent, idx, disp_liq, selected, active_turn, shocked, ba
 
     tx(surf, BANK_NAMES[idx], fonts["sm"], GOLD if selected else TEXT, cx, by+BK_H+14)
     tx(surf, f"L:{agent.liquid:.0f}  I:{agent.illiquid:.0f}", fonts["xs"], DIM, cx, by+BK_H+30)
+    tx(surf, f"C:{agent.capital:+.0f}", fonts["xs"], LIQ if agent.capital > 0 else ILLIQ, cx, by+BK_H+42)
 
     bw = BK_W - 12
     c2 = agent.coop_score
-    rr(surf, PANEL2, (bx+6, by+BK_H+43, bw, 7),          3)
-    rr(surf, lc(ILLIQ,LIQ,c2), (bx+6, by+BK_H+43, int(bw*c2), 7), 3)
-    tx(surf, f"COOP {c2*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,c2), cx, by+BK_H+59)
+    rr(surf, PANEL2, (bx+6, by+BK_H+55, bw, 7),          3)
+    rr(surf, lc(ILLIQ,LIQ,c2), (bx+6, by+BK_H+55, int(bw*c2), 7), 3)
+    tx(surf, f"COOP {c2*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,c2), cx, by+BK_H+71)
 
     if agent.qe_bonus > 0:
-        tx(surf, f"QE+{agent.qe_bonus:.0f}", fonts["xs"], ACC2, cx, by+BK_H+73)
+        tx(surf, f"QE+{agent.qe_bonus:.0f}", fonts["xs"], ACC2, cx, by+BK_H+85)
     if agent.mandate_turns > 0:
-        tx(surf, f"MAND {agent.mandate_turns}t", fonts["xs"], (100,180,255), cx, by+BK_H+73)
+        tx(surf, f"MAND {agent.mandate_turns}t", fonts["xs"], (100,180,255), cx, by+BK_H+85)
 
 
 def draw_right_panel(surf, agents, player, ep, step, event_log, liq_hist, fonts):
@@ -553,6 +570,9 @@ def draw_overlay(surf, title, subtitle, stats, hint, title_clr, border_clr, font
 
 def apply_tool(key, player, agents, ripples, flow_dots, event_log, shock_target_ref):
     def log(msg, clr=DIM): event_log.append({"msg":msg,"color":clr})
+    if agents[0].bankrupt:
+        log("Bankrupt! You may only spectate.", ILLIQ)
+        return
     sel = player.selected
 
     if key=="r":
@@ -600,13 +620,14 @@ def apply_tool(key, player, agents, ripples, flow_dots, event_log, shock_target_
 
     elif key=="t":
         if ag.last_action>1: log("Bank is not hoarding",DIM); return
-        ag.capital=max(10,ag.capital-20)
+        ag.capital -= 20
         ag.apply_action(ag.last_action)
         player.earn(15)
         log(f"TAXED HOARDER: {BANK_NAMES[sel]} -20 cap", WARN)
 
     elif key=="x":
         amt=random.randint(40,90)
+        ag.capital -= amt
         ag.liquid=max(0,ag.liquid-amt)
         ripples+=[Ripple(cx,cy,SHOKC),Ripple(cx,cy,(255,180,50),speed=2,max_r=80)]
         log(f"STRESS TEST: {BANK_NAMES[sel]} -{amt}", SHOKC)
@@ -651,6 +672,9 @@ def run():
     game_state  = "PLAYING"
     tool_rects  = []
     hov_tool    = -1
+    
+    win_reason = ""
+    lose_reason = ""
 
     pending_shock     = None
     pending_states    = None
@@ -663,15 +687,18 @@ def run():
 
     def prepare_step():
         fed = player.fed_rate
-        states  = [a.get_state(agents,fed) for a in agents]
+        states  = [a.get_state(agents,fed) if not a.bankrupt else None for a in agents]
         actions = [a.act(s) for a,s in zip(agents,states)]
         for a,ac in zip(agents,actions): a.apply_action(ac)
         elr = BASE_LIQ[fed] + (0.02 if player.rate_cut_turns>0 else 0)
         eir = BASE_ILLIQ[fed]
-        rewards = [a.liquid*elr + a.illiquid*eir for a in agents]
+        rewards = [a.liquid*elr + a.illiquid*eir if not a.bankrupt else 0 for a in agents]
+        for i, a in enumerate(agents):
+            if not a.bankrupt: a.capital += rewards[i]
         shock_info = None
-        if random.random() < SHOCK_PROB:
-            si=random.randint(0,NUM_AGENTS-1)
+        active_agents = [i for i, a in enumerate(agents) if not a.bankrupt]
+        if active_agents and random.random() < SHOCK_PROB:
+            si=random.choice(active_agents)
             sa=random.randint(40,90)
             shock_info={"idx":si,"amt":sa}
         return states,actions,rewards,shock_info
@@ -681,11 +708,13 @@ def run():
         if shock_info and not bailed:
             si,sa = shock_info["idx"],shock_info["amt"]
             tgt   = agents[si]
+            tgt.capital -= sa
             if tgt.liquid < sa:
                 shortfall = sa - tgt.liquid
-                sys_liq   = sum(a.liquid for a in agents) - tgt.liquid
+                sys_liq   = sum(a.liquid for a in agents if not a.bankrupt) - tgt.liquid
                 if sys_liq < shortfall:
-                    for j in range(NUM_AGENTS): rewards[j]-=100
+                    for j in range(NUM_AGENTS):
+                        if not agents[j].bankrupt: rewards[j]-=100
                     player.damage(15)
                     player.collapses+=1
                     log("SYSTEMIC COLLAPSE! -15 health",ILLIQ)
@@ -693,7 +722,10 @@ def run():
                     rewards[si]-=20
                     td2=max(sys_liq,1)
                     for j,a in enumerate(agents):
-                        if j!=si: a.liquid=max(0,a.liquid-a.liquid/td2*shortfall)
+                        if j!=si and not a.bankrupt:
+                            impact = a.liquid/td2*shortfall
+                            a.liquid=max(0,a.liquid-impact)
+                            a.capital -= impact
                     log(f"{BANK_NAMES[si]}: cascade shock -{sa}",SHOKC)
                     player.damage(3)
             else:
@@ -707,8 +739,18 @@ def run():
         if player.rate_cut_turns>0: player.rate_cut_turns-=1
         player.regen()
 
-        ns=[a.get_state(agents,fed) for a in agents]
-        for i,a in enumerate(agents): a.learn(states[i],actions[i],rewards[i],ns[i])
+        for i, a in enumerate(agents):
+            if not a.bankrupt and a.capital <= 0:
+                a.bankrupt = True
+                a.capital = 0
+                a.liquid = 0
+                a.illiquid = 0
+                log(f"BANKRUPT: {BANK_NAMES[i]} IS DEAD!", ILLIQ)
+
+        ns=[a.get_state(agents,fed) if not a.bankrupt else None for a in agents]
+        for i,a in enumerate(agents):
+            if not a.bankrupt and states[i] is not None and ns[i] is not None:
+                a.learn(states[i],actions[i],rewards[i],ns[i])
 
     running=True
     while running:
@@ -806,13 +848,33 @@ def run():
                                            "fed_rate":player.fed_rate,"health":player.health})
                         episode+=1; step=0
                         for a in agents:
-                            a.capital=INIT_CAPITAL; a.qe_bonus=0.0
-                            a.liquid=a.capital*ACTION_PCT[a.last_action]
-                            a.illiquid=a.capital-a.liquid
+                            a.qe_bonus=0.0
+                            if not a.bankrupt:
+                                a.liquid=a.eff_cap()*ACTION_PCT[a.last_action]
+                                a.illiquid=a.eff_cap()-a.liquid
                             disp_liq[a.id]=a.liquid
-                    if player.game_over:       game_state="GAME_OVER"
-                    elif episode>=NUM_EPISODES: game_state="WIN"
-                    else: phase="AGENT_TURN"; phase_start=now
+
+                    active_ai = sum(1 for a in agents[1:] if not a.bankrupt)
+
+                    # Win/Loss Evaluation
+                    if player.game_over:
+                        game_state="GAME_OVER"
+                        lose_reason="The interbank network has failed under your watch."
+                    elif not agents[0].bankrupt and active_ai == 0:
+                        game_state="WIN"
+                        win_reason="SURVIVAL: Outlasted all AI banks!"
+                    elif episode>=NUM_EPISODES:
+                        if not agents[0].bankrupt and all(agents[0].capital >= a.capital for a in agents[1:] if not a.bankrupt):
+                            game_state="WIN"
+                            win_reason="APEX CAPITALIST: Highest cumulative capital ($C_i$)!"
+                        else:
+                            game_state="GAME_OVER"
+                            if agents[0].bankrupt:
+                                lose_reason="BANKRUPT: Player $C_0$ <= 0."
+                            else:
+                                lose_reason="AI achieved higher capital by Turn 2000."
+                    else:
+                        phase="AGENT_TURN"; phase_start=now
 
         if shock_flash>0: shock_flash-=1
         for r in ripples:   r.update()
@@ -867,7 +929,7 @@ def run():
         if game_state=="GAME_OVER":
             rt,rc2=player.rating()
             draw_overlay(screen,
-                "SYSTEM COLLAPSED","The interbank network has failed under your watch.",
+                "SYSTEM COLLAPSED", lose_reason,
                 [(f"Survived",f"{episode} of {NUM_EPISODES} episodes",DIM),
                  ("Collapses",str(player.collapses),ILLIQ),
                  ("Interventions",str(player.interventions),BAILC),
@@ -877,7 +939,7 @@ def run():
         elif game_state=="WIN":
             rt,rc2=player.rating()
             draw_overlay(screen,
-                "MISSION COMPLETE","You stabilised the global banking system!",
+                "MISSION COMPLETE", win_reason,
                 [(f"Final Health",f"{player.health:.0f}/100",lc(ILLIQ,LIQ,player.health/100)),
                  ("Collapses",str(player.collapses),LIQ if player.collapses==0 else ILLIQ),
                  ("Interventions",str(player.interventions),BAILC),
