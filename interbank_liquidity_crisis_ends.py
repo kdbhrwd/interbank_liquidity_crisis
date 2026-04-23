@@ -13,7 +13,7 @@ SHOCK_PROB   = 0.15
 
 ACTION_PCT    = [0.0, 0.25, 0.50, 0.75, 1.00]
 ACTION_LABELS = ["HOARD", "CAUTIOUS", "BALANCED", "LIQUID", "FLUSH"]
-STRAT_COLORS  = [(220,60,90),(240,130,60),(220,200,55),(80,210,160),(34,211,140)]
+STRAT_COLORS  = [(208,96,104),(222,142,80),(210,188,80),(92,180,160),(64,175,120)]
 BANK_NAMES    = ["FIRST NAT.", "PAC.TRUST", "CENTURY", "METRO CAP", "ATLAS RES."]
 BASE_LIQ      = [0.010, 0.030]
 BASE_ILLIQ    = [0.060, 0.060]
@@ -30,31 +30,32 @@ BK_W, BK_H, BK_TOP = 98, 264, TOP_H + 16
 STEP_MS     = [3000, 1500, 750, 350, 120, 10]
 SPEED_NAMES = ["SLOW", "NORM", "FAST", "2x", "4x", "MAX"]
 
-BG     = (8,10,18)
-PANEL  = (13,18,35)
-PANEL2 = (19,26,50)
-LIQ    = (34,211,140)
-ILLIQ  = (220,60,90)
-SHOKC  = (255,215,50)
-BAILC  = (60,120,255)
-TEXT   = (220,228,245)
-DIM    = (75,98,128)
-ACCENT = (120,100,255)
-ACC2   = (0,200,180)
-GOLD   = (255,200,55)
-WARN   = (255,160,50)
-GOOD   = (50,200,120)
-NETC   = (22,38,72)
-ACTIVE = (185,164,255)
+BG      = (11,14,20)
+PANEL   = (17,21,29)
+PANEL2  = (24,29,39)
+HAIR    = (40,48,62)
+LIQ     = (64,175,120)
+ILLIQ   = (224,96,100)
+SHOKC   = (218,175,62)
+BAILC   = (96,156,228)
+TEXT    = (225,232,240)
+DIM     = (120,132,148)
+ACCENT  = (132,144,228)
+ACC2    = (72,172,178)
+GOLD    = (220,184,92)
+WARN    = (228,164,92)
+GOOD    = (92,188,132)
+NETC    = (32,40,54)
+ACTIVE  = (160,156,210)
 
 TOOLS = [
     dict(key="b", label="BAILOUT",      desc="Restore target bank",  cost=50, earn=0,  sel=True,  clr=BAILC,            kcode=pygame.K_b),
     dict(key="q", label="QE INJECT",    desc="Add +25 capital",      cost=35, earn=0,  sel=True,  clr=ACC2,             kcode=pygame.K_q),
-    dict(key="e", label="MANDATE LIQ",  desc="Force LIQUID x8 steps",cost=20, earn=0,  sel=True,  clr=(100,180,255),    kcode=pygame.K_e),
+    dict(key="e", label="MANDATE LIQ",  desc="Force LIQUID x8 steps",cost=20, earn=0,  sel=True,  clr=BAILC,            kcode=pygame.K_e),
     dict(key="t", label="TAX HOARDER",  desc="Penalise HOARD bank",  cost=0,  earn=15, sel=True,  clr=WARN,             kcode=pygame.K_t),
     dict(key="c", label="RATE CUT",     desc="Boost liq rates x15",  cost=60, earn=0,  sel=False, clr=GOOD,             kcode=pygame.K_c),
     dict(key="x", label="STRESS TEST",  desc="Manual shock on bank", cost=0,  earn=0,  sel=True,  clr=SHOKC,            kcode=pygame.K_x),
-    dict(key="r", label="RATE TOGGLE",  desc="Flip Fed rate",        cost=0,  earn=0,  sel=False, clr=(180,140,255),    kcode=pygame.K_r),
+    dict(key="r", label="RATE TOGGLE",  desc="Flip Fed rate",        cost=0,  earn=0,  sel=False, clr=ACCENT,           kcode=pygame.K_r),
 ]
 
 
@@ -222,7 +223,7 @@ def lc(a, b, t):
     t = max(0.0, min(1.0, t))
     return tuple(int(a[i]+(b[i]-a[i])*t) for i in range(3))
 
-def rr(surf, color, rect, r=8, w=0):
+def rr(surf, color, rect, r=5, w=0):
     x,y,ww,hh = int(rect[0]),int(rect[1]),int(rect[2]),int(rect[3])
     if len(color)==4:
         s = pygame.Surface((ww,hh), pygame.SRCALPHA)
@@ -239,132 +240,146 @@ def tx(surf, msg, font, color, cx, cy, anchor="center"):
 
 
 def draw_top_hud(surf, player, ep, step, speed_idx, fonts):
+    # Header bar - single flat surface, hairline border beneath
     rr(surf, PANEL, (0,0,W,TOP_H), 0)
-    pygame.draw.line(surf, (28,38,70), (0,TOP_H-1), (W,TOP_H-1), 1)
+    pygame.draw.line(surf, HAIR, (0,TOP_H-1), (W,TOP_H-1), 1)
 
-    rr(surf, PANEL2, (LP_X+4, 8, LP_W-8, TOP_H-16), 8)
-    tx(surf, "CENTRAL BANK CMD", fonts["sm"], ACCENT, LP_X+LP_W//2, 26)
-    tx(surf, "You are the Federal Reserve", fonts["xs"], DIM, LP_X+LP_W//2, 46)
-    tx(surf, "Stabilize the network", fonts["xs"], DIM, LP_X+LP_W//2, 60)
+    # ---- Title block --------------------------------------------------------
+    tx(surf, "CENTRAL BANK",     fonts["sm"], TEXT,   LP_X+14, 28, anchor="midleft")
+    tx(surf, "Federal Reserve",  fonts["xs"], DIM,    LP_X+14, 46, anchor="midleft")
+    tx(surf, "Stabilize network", fonts["xs"], DIM,   LP_X+14, 60, anchor="midleft")
+    pygame.draw.line(surf, HAIR, (LP_X+LP_W-2, 14), (LP_X+LP_W-2, TOP_H-14), 1)
 
-    hx = LP_X+LP_W+20
-    rr(surf, PANEL2, (hx, 8, 220, TOP_H-16), 8)
-    tx(surf, "SYSTEMIC HEALTH", fonts["xs"], DIM, hx+110, 20)
-    rr(surf, (22,32,58), (hx+8, 28, 204, 14), 7)
+    def _section(sx, sw, title):
+        tx(surf, title, fonts["xs"], DIM, sx+10, 18, anchor="midleft")
+        pygame.draw.line(surf, HAIR, (sx+sw-1, 14), (sx+sw-1, TOP_H-14), 1)
+
+    # ---- Systemic Health ----------------------------------------------------
+    hx, hw = LP_X+LP_W+8, 230
+    _section(hx, hw, "SYSTEMIC HEALTH")
+    rr(surf, PANEL2, (hx+10, 32, hw-20, 10), 3)
     hc = lc(ILLIQ, GOOD, player.health/100)
-    rr(surf, hc, (hx+8, 28, int(204*player.health/100), 14), 7)
-    tx(surf, f"{player.health:.0f} / 100", fonts["xs"], hc, hx+110, 50)
-
-    pulse = math.sin(pygame.time.get_ticks()*0.003)*8
-    if player.health < 30:
-        rr(surf, (*ILLIQ, 60), (hx, 8, 220, TOP_H-16), 8)
-
+    rr(surf, hc, (hx+10, 32, int((hw-20)*player.health/100), 10), 3)
+    tx(surf, f"{player.health:.0f} / 100", fonts["xs"], TEXT, hx+10, 56, anchor="midleft")
     rating, rc = player.rating()
-    rr(surf, PANEL2, (hx+230, 8, 80, TOP_H-16), 8)
-    tx(surf, "RATING", fonts["xs"], DIM,  hx+270, 20)
-    tx(surf, rating,   fonts["md"], rc,   hx+270, 51)
+    tx(surf, rating, fonts["md"], rc, hx+hw-14, 54, anchor="midright")
 
-    bx = hx+320
-    rr(surf, PANEL2, (bx, 8, 190, TOP_H-16), 8)
-    tx(surf, "POLICY BUDGET", fonts["xs"], DIM, bx+95, 20)
-    rr(surf, (22,32,58), (bx+8, 30, 174, 10), 5)
-    bc = lc(ILLIQ, ACC2, player.budget/player.MAX_BUDGET)
-    rr(surf, bc, (bx+8, 30, int(174*player.budget/player.MAX_BUDGET), 10), 5)
-    tx(surf, f"${player.budget} / ${player.MAX_BUDGET}", fonts["xs"], bc, bx+95, 52)
+    # ---- Budget -------------------------------------------------------------
+    bx, bw = hx+hw, 200
+    _section(bx, bw, "POLICY BUDGET")
+    rr(surf, PANEL2, (bx+10, 32, bw-20, 10), 3)
+    bcol = lc(ILLIQ, ACC2, player.budget/player.MAX_BUDGET)
+    rr(surf, bcol, (bx+10, 32, int((bw-20)*player.budget/player.MAX_BUDGET), 10), 3)
+    tx(surf, f"${player.budget}", fonts["xs"], TEXT, bx+10, 56, anchor="midleft")
+    tx(surf, f"/ ${player.MAX_BUDGET}", fonts["xs"], DIM, bx+bw-14, 56, anchor="midright")
 
-    sx2 = bx+200
-    rr(surf, PANEL2, (sx2, 8, 170, TOP_H-16), 8)
-    fed_c = (251,113,133) if player.fed_rate else (52,200,150)
-    tx(surf, "FED: "+("HIGH(3%)" if player.fed_rate else "LOW(1%)"),  fonts["xs"], fed_c,   sx2+85, 20)
+    # ---- Fed / Speed --------------------------------------------------------
+    sx2, sw2 = bx+bw, 180
+    _section(sx2, sw2, "MONETARY POLICY")
+    fed_c = WARN if player.fed_rate else GOOD
+    tx(surf, f"Fed {'HIGH 3%' if player.fed_rate else 'LOW 1%'}", fonts["xs"], fed_c, sx2+10, 36, anchor="midleft")
     rc2 = WARN if player.rate_cut_turns>0 else DIM
-    tx(surf, f"Rate Cut: {'ON '+str(player.rate_cut_turns)+'t' if player.rate_cut_turns else 'off'}", fonts["xs"], rc2, sx2+85, 37)
-    tx(surf, f"Speed: {SPEED_NAMES[speed_idx]}", fonts["xs"], ACCENT, sx2+85, 54)
+    tx(surf, f"Rate Cut {'ON '+str(player.rate_cut_turns)+'t' if player.rate_cut_turns else 'OFF'}", fonts["xs"], rc2, sx2+10, 52, anchor="midleft")
+    tx(surf, SPEED_NAMES[speed_idx], fonts["xs"], ACCENT, sx2+sw2-14, 52, anchor="midright")
 
-    ex = sx2+180
-    rr(surf, PANEL2, (ex, 8, 180, TOP_H-16), 8)
-    tx(surf, f"Episode {ep:04d} / {NUM_EPISODES}", fonts["xs"], TEXT,  ex+90, 20)
-    tx(surf, f"Step    {step:02d} / {STEPS_PER_EP}",  fonts["xs"], DIM,   ex+90, 37)
-    tx(surf, f"Collapses: {player.collapses}",         fonts["xs"], ILLIQ if player.collapses else DIM, ex+90, 54)
+    # ---- Episode progress ---------------------------------------------------
+    ex, ew = sx2+sw2, 200
+    _section(ex, ew, "PROGRESS")
+    tx(surf, f"EP {ep:04d}/{NUM_EPISODES}", fonts["xs"], TEXT, ex+10, 36, anchor="midleft")
+    tx(surf, f"Step {step:02d}/{STEPS_PER_EP}", fonts["xs"], DIM, ex+10, 52, anchor="midleft")
+    col_c = ILLIQ if player.collapses else DIM
+    tx(surf, f"Collapses {player.collapses}", fonts["xs"], col_c, ex+ew-14, 52, anchor="midright")
 
-    ix = ex+190
-    if ix+170 < W-RP_W-10:
-        rr(surf, PANEL2, (ix, 8, 155, TOP_H-16), 8)
-        tx(surf, f"Interventions: {player.interventions}", fonts["xs"], BAILC, ix+77, 38)
-        tx(surf, "[1-5] Select Bank", fonts["xs"], DIM, ix+77, 56)
+    # ---- Interventions ------------------------------------------------------
+    ix = ex+ew
+    if ix+140 < W-RP_W-10:
+        _section(ix, W-RP_W-ix-4, "INTERVENTIONS")
+        tx(surf, str(player.interventions), fonts["md"], BAILC, ix+12, 46, anchor="midleft")
+        tx(surf, "[1-5] select bank", fonts["xs"], DIM, ix+60, 46, anchor="midleft")
 
 
 def draw_left_panel(surf, player, agents, tool_rects, hovered_tool, fonts):
-    rr(surf, PANEL, (LP_X, TOP_H, LP_W, H-TOP_H-4), 10)
-    x, y, w = LP_X+6, TOP_H+10, LP_W-12
+    rr(surf, PANEL, (LP_X, TOP_H, LP_W, H-TOP_H-4), 8)
+    x, y, w = LP_X+8, TOP_H+12, LP_W-16
 
-    tx(surf, "POLICY TOOLS", fonts["sm"], ACCENT, x+w//2, y+10)
-    pygame.draw.line(surf, (30,42,74), (x,y+22), (x+w,y+22), 1)
-    y += 30
+    tx(surf, "POLICY TOOLS", fonts["xs"], DIM, x, y, anchor="topleft")
+    y += 16
+    pygame.draw.line(surf, HAIR, (x, y), (x+w, y), 1)
+    y += 10
 
-    rr(surf, PANEL2, (x, y, w, 88), 6)
+    # --- Target card --------------------------------------------------------
+    rr(surf, PANEL2, (x, y, w, 86), 5)
     if player.selected >= 0:
         ag = agents[player.selected]
         sc = STRAT_COLORS[ag.last_action]
-        tx(surf, BANK_NAMES[player.selected], fonts["sm"], GOLD, x+w//2, y+12)
-        rr(surf, sc, (x+5, y+26, w-10, 17), 8)
-        tx(surf, ACTION_LABELS[ag.last_action], fonts["xs"], BG, x+w//2, y+34)
-        tx(surf, f"L:{ag.liquid:.0f}  I:{ag.illiquid:.0f}", fonts["xs"], TEXT, x+w//2, y+48)
-        tx(surf, f"C:{ag.capital:+.0f}", fonts["xs"], LIQ if ag.capital>0 else ILLIQ, x+w//2, y+58)
-        cw = w-16
+        pygame.draw.rect(surf, sc, (x, y, 3, 86))
+        tx(surf, BANK_NAMES[player.selected], fonts["sm"], TEXT, x+10, y+10, anchor="topleft")
+        tx(surf, ACTION_LABELS[ag.last_action], fonts["xs"], sc, x+10, y+26, anchor="topleft")
+        tx(surf, f"L {ag.liquid:.0f}", fonts["xs"], LIQ,   x+10, y+44, anchor="topleft")
+        tx(surf, f"I {ag.illiquid:.0f}", fonts["xs"], ILLIQ, x+60, y+44, anchor="topleft")
+        tx(surf, f"C {ag.capital:+.0f}", fonts["xs"], TEXT if ag.capital>0 else ILLIQ, x+10, y+58, anchor="topleft")
+        cw = w-20
         coop = ag.coop_score
-        rr(surf, (20,32,58), (x+8, y+68, cw, 7), 3)
-        rr(surf, lc(ILLIQ,LIQ,coop), (x+8, y+68, int(cw*coop), 7), 3)
+        rr(surf, BG, (x+10, y+72, cw, 5), 2)
+        rr(surf, lc(ILLIQ,LIQ,coop), (x+10, y+72, int(cw*coop), 5), 2)
         if ag.mandate_turns > 0:
-            tx(surf, f"MANDATED {ag.mandate_turns}t", fonts["xs"], (100,180,255), x+w//2, y+82)
+            tx(surf, f"MANDATE {ag.mandate_turns}t", fonts["xs"], BAILC, x+w-10, y+60, anchor="topright")
         else:
-            tx(surf, f"Coop {coop*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,coop), x+w//2, y+82)
+            tx(surf, f"{coop*100:.0f}% coop", fonts["xs"], DIM, x+w-10, y+60, anchor="topright")
     else:
-        tx(surf, "NO TARGET", fonts["xs"], DIM, x+w//2, y+18)
-        tx(surf, "Click a bank or", fonts["xs"], DIM, x+w//2, y+36)
-        tx(surf, "press [1-5]", fonts["xs"], DIM, x+w//2, y+52)
-        tx(surf, "to select", fonts["xs"], DIM, x+w//2, y+68)
-    y += 96
+        tx(surf, "NO TARGET", fonts["xs"], DIM, x+10, y+14, anchor="topleft")
+        tx(surf, "Click a bank or", fonts["xs"], DIM, x+10, y+34, anchor="topleft")
+        tx(surf, "press [1-5] to", fonts["xs"], DIM, x+10, y+48, anchor="topleft")
+        tx(surf, "select a target", fonts["xs"], DIM, x+10, y+62, anchor="topleft")
+    y += 94
 
+    # --- Tool buttons -------------------------------------------------------
     tool_rects.clear()
     for ti, td in enumerate(TOOLS):
         can = not td["sel"] or player.selected >= 0
         aff = player.budget >= td["cost"]
-        clr = td["clr"] if (can and aff) else DIM
-        bg  = PANEL2 if can else (15,22,40)
-        hov = (hovered_tool == ti)
+        live = can and aff
+        hov = (hovered_tool == ti) and live
+        clr = td["clr"] if live else DIM
 
-        rect = (x, y, w, 36)
+        rect = (x, y, w, 34)
         tool_rects.append((rect, td["key"]))
-        rr(surf, bg, rect, 6)
-        if can and aff:
-            rr(surf, (*clr, 40 if hov else 15), rect, 6)
-            pygame.draw.rect(surf, clr, (x,y,w,36), 1, border_radius=6)
+        # Base
+        rr(surf, PANEL2 if live else (20,24,32), rect, 5)
+        # Left accent strip (indicates tool color / enabled state)
+        pygame.draw.rect(surf, clr if live else HAIR, (x, y, 3, 34))
+        # Hover: subtle outline only
+        if hov:
+            pygame.draw.rect(surf, clr, (x,y,w,34), 1, border_radius=5)
 
-        kw = 20
-        rr(surf, clr if (can and aff) else (28,36,56), (x+3, y+8, kw, 20), 4)
-        tx(surf, td["key"].upper(), fonts["xs"], BG if (can and aff) else (50,65,90), x+3+kw//2, y+18)
+        # Hotkey badge
+        tx(surf, td["key"].upper(), fonts["sm"], clr if live else DIM, x+14, y+17, anchor="midleft")
 
-        tx(surf, td["label"], fonts["sm" if hov else "xs"], TEXT if (can and aff) else (50,65,90), x+28, y+10, anchor="midleft")
-        tx(surf, td["desc"],  fonts["xs"], lc(DIM,TEXT,0.5) if (can and aff) else (40,55,70), x+28, y+26, anchor="midleft")
+        # Label + description
+        lbl_c = TEXT if live else DIM
+        dsc_c = DIM  if live else (65,75,88)
+        tx(surf, td["label"], fonts["xs"], lbl_c, x+30, y+10, anchor="midleft")
+        tx(surf, td["desc"],  fonts["xs"], dsc_c, x+30, y+24, anchor="midleft")
 
+        # Cost / earn indicator
         if td["earn"]:
-            cs, cc = f"+${td['earn']}", GOOD
+            cs, cc = f"+${td['earn']}", GOOD if live else DIM
         elif td["cost"]:
-            cs, cc = f"-${td['cost']}", lc(ILLIQ,(220,160,80),0.5) if (can and aff) else DIM
+            cs, cc = f"-${td['cost']}", WARN if live else DIM
         else:
-            cs, cc = "FREE", ACCENT if (can and aff) else DIM
-        tx(surf, cs, fonts["xs"], cc, x+w-4, y+18, anchor="midright")
-        y += 40
+            cs, cc = "FREE", ACCENT if live else DIM
+        tx(surf, cs, fonts["xs"], cc, x+w-6, y+17, anchor="midright")
+        y += 38
 
-    y += 4
-    pygame.draw.line(surf, (30,42,74), (x,y), (x+w,y), 1)
-    y += 8
+    y += 6
+    pygame.draw.line(surf, HAIR, (x, y), (x+w, y), 1)
+    y += 10
 
-    tx(surf, "CONTROLS", fonts["xs"], DIM, x+w//2, y+9)
-    y += 20
-    for line in ["[↑/↓]  Speed", "[SPACE]  Pause/Resume", "[1-5]  Select Bank", "[ESC]   Quit"]:
-        tx(surf, line, fonts["xs"], (90,110,140), x+w//2, y)
-        y += 16
+    tx(surf, "CONTROLS", fonts["xs"], DIM, x, y, anchor="topleft")
+    y += 16
+    for line in ["↑ / ↓     speed", "space     pause", "1 - 5     select", "esc       quit"]:
+        tx(surf, line, fonts["xs"], DIM, x, y, anchor="topleft")
+        y += 14
 
 
 def draw_bank_col(surf, agent, idx, disp_liq, selected, active_turn, shocked, bail_window, fonts):
@@ -372,123 +387,128 @@ def draw_bank_col(surf, agent, idx, disp_liq, selected, active_turn, shocked, ba
     bx = cx - BK_W//2
     by = BK_TOP
 
-    rr(surf, PANEL, (bx-10, by-10, BK_W+20, BK_H+20), 10)
+    # Card backdrop
+    rr(surf, PANEL, (bx-8, by-8, BK_W+16, BK_H+16), 6)
 
     if agent.bankrupt:
-        rr(surf, (50, 50, 50), (bx, by, BK_W, BK_H), 6)
-        tx(surf, "BANKRUPT", fonts["xs"], (200, 50, 50), cx, by+100)
+        rr(surf, (32,34,40), (bx, by, BK_W, BK_H), 4)
+        tx(surf, "BANKRUPT", fonts["xs"], ILLIQ, cx, by+110)
         tx(surf, BANK_NAMES[idx], fonts["sm"], DIM, cx, by+BK_H+14)
-        tx(surf, "L:0 I:0", fonts["xs"], DIM, cx, by+BK_H+30)
-        tx(surf, f"C:{agent.capital:+.0f}", fonts["xs"], (150, 50, 50), cx, by+BK_H+44)
+        tx(surf, "L 0   I 0", fonts["xs"], DIM, cx, by+BK_H+30)
+        tx(surf, f"C {agent.capital:+.0f}", fonts["xs"], ILLIQ, cx, by+BK_H+44)
         return
 
-    pct  = max(0.0, min(1.0, disp_liq / max(agent.eff_cap(), 1)))
-    lh   = int(BK_H * pct)
-    ih   = BK_H - lh
-    if ih > 0: rr(surf, ILLIQ, (bx, by, BK_W, ih),    6)
-    if lh > 0: rr(surf, LIQ,   (bx, by+ih, BK_W, lh), 6)
+    # Liquid / Illiquid stack
+    pct = max(0.0, min(1.0, disp_liq / max(agent.eff_cap(), 1)))
+    lh  = int(BK_H * pct)
+    ih  = BK_H - lh
+    if ih > 0: rr(surf, ILLIQ, (bx, by, BK_W, ih),    4)
+    if lh > 0: rr(surf, LIQ,   (bx, by+ih, BK_W, lh), 4)
 
     if agent.qe_bonus > 0:
-        rr(surf, (*ACC2, 55), (bx, by, BK_W, BK_H), 6)
+        rr(surf, (*ACC2, 42), (bx, by, BK_W, BK_H), 4)
 
-    if agent.mandate_turns > 0:
-        pygame.draw.rect(surf, (100,180,255), (bx-10,by-10,BK_W+20,BK_H+20), 2, border_radius=10)
-
-    if selected:
-        t = (pygame.time.get_ticks() % 900) / 900
-        a = int(140+110*math.sin(t*2*math.pi))
-        rr(surf, (*GOLD, a), (bx-10,by-10,BK_W+20,BK_H+20), 10, w=3)
-
-    if active_turn and not selected:
-        rr(surf, (*(ACTIVE),35), (bx-10,by-10,BK_W+20,BK_H+20), 10)
-        pygame.draw.rect(surf, ACTIVE, (bx-10,by-10,BK_W+20,BK_H+20), 2, border_radius=10)
-
+    # State indicators - no pulsing
     if shocked:
-        pygame.draw.rect(surf, SHOKC, (bx-10,by-10,BK_W+20,BK_H+20), 3, border_radius=10)
+        pygame.draw.rect(surf, SHOKC, (bx-8,by-8,BK_W+16,BK_H+16), 2, border_radius=6)
+    elif selected:
+        pygame.draw.rect(surf, GOLD, (bx-8,by-8,BK_W+16,BK_H+16), 2, border_radius=6)
+    elif agent.mandate_turns > 0:
+        pygame.draw.rect(surf, BAILC, (bx-8,by-8,BK_W+16,BK_H+16), 1, border_radius=6)
+    elif active_turn:
+        pygame.draw.rect(surf, HAIR, (bx-8,by-8,BK_W+16,BK_H+16), 1, border_radius=6)
+        pygame.draw.rect(surf, ACTIVE, (bx-8, by+BK_H+6, BK_W+16, 2))
+
+    # Shock banner above card
+    if shocked:
         if bail_window:
-            t2 = (pygame.time.get_ticks()%600)/600
-            a2 = int(150+100*math.sin(t2*math.pi*2))
-            rr(surf, (*BAILC, a2), (bx-10,by-30,BK_W+20,20), 6)
-            tx(surf, "BAIL [B]!", fonts["xs"], TEXT, cx, by-20)
+            rr(surf, BAILC, (bx-8, by-30, BK_W+16, 18), 3)
+            tx(surf, "BAIL  [B]", fonts["xs"], BG, cx, by-21)
         else:
-            tx(surf, "SHOCK!", fonts["xs"], SHOKC, cx, by-20)
+            tx(surf, "SHOCK", fonts["xs"], SHOKC, cx, by-20)
 
+    # Strategy label band on top of stack
     sc = STRAT_COLORS[agent.last_action]
-    rr(surf, sc, (bx+5, by+8, BK_W-10, 17), 8)
-    tx(surf, ACTION_LABELS[agent.last_action], fonts["xs"], BG, cx, by+16)
+    rr(surf, sc, (bx+4, by+6, BK_W-8, 16), 4)
+    tx(surf, ACTION_LABELS[agent.last_action], fonts["xs"], BG, cx, by+14)
 
-    tier_lbls   = ["STRESSED","MODERATE","STABLE"]
-    tier_clrs   = [ILLIQ, WARN, LIQ]
-    own_t       = agent.tier(agent.liquid / max(agent.eff_cap(),1))
-    lbl_y       = by - 20 if not shocked else by - 38
-    if not shocked or not bail_window:
-        tx(surf, tier_lbls[own_t], fonts["xs"], tier_clrs[own_t], cx, lbl_y)
+    # Tier label above card (hidden during bail)
+    tier_lbls = ["STRESSED","MODERATE","STABLE"]
+    tier_clrs = [ILLIQ, WARN, LIQ]
+    own_t     = agent.tier(agent.liquid / max(agent.eff_cap(),1))
+    if not (shocked and bail_window):
+        tx(surf, tier_lbls[own_t], fonts["xs"], tier_clrs[own_t], cx, by-20)
 
+    # Bank name + stats below card
     tx(surf, BANK_NAMES[idx], fonts["sm"], GOLD if selected else TEXT, cx, by+BK_H+14)
-    tx(surf, f"L:{agent.liquid:.0f}  I:{agent.illiquid:.0f}", fonts["xs"], DIM, cx, by+BK_H+30)
-    tx(surf, f"C:{agent.capital:+.0f}", fonts["xs"], LIQ if agent.capital > 0 else ILLIQ, cx, by+BK_H+42)
+    tx(surf, f"L {agent.liquid:.0f}   I {agent.illiquid:.0f}", fonts["xs"], DIM, cx, by+BK_H+30)
+    cap_c = TEXT if agent.capital > 0 else ILLIQ
+    tx(surf, f"C {agent.capital:+.0f}", fonts["xs"], cap_c, cx, by+BK_H+42)
 
+    # Coop bar
     bw = BK_W - 12
     c2 = agent.coop_score
-    rr(surf, PANEL2, (bx+6, by+BK_H+55, bw, 7),          3)
-    rr(surf, lc(ILLIQ,LIQ,c2), (bx+6, by+BK_H+55, int(bw*c2), 7), 3)
-    tx(surf, f"COOP {c2*100:.0f}%", fonts["xs"], lc(ILLIQ,LIQ,c2), cx, by+BK_H+71)
+    rr(surf, BG, (bx+6, by+BK_H+56, bw, 4), 2)
+    rr(surf, lc(ILLIQ,LIQ,c2), (bx+6, by+BK_H+56, int(bw*c2), 4), 2)
+    tx(surf, f"{c2*100:.0f}% coop", fonts["xs"], DIM, cx, by+BK_H+70)
 
+    # Status badges
     if agent.qe_bonus > 0:
-        tx(surf, f"QE+{agent.qe_bonus:.0f}", fonts["xs"], ACC2, cx, by+BK_H+85)
-    if agent.mandate_turns > 0:
-        tx(surf, f"MAND {agent.mandate_turns}t", fonts["xs"], (100,180,255), cx, by+BK_H+85)
+        tx(surf, f"QE +{agent.qe_bonus:.0f}", fonts["xs"], ACC2, cx, by+BK_H+84)
+    elif agent.mandate_turns > 0:
+        tx(surf, f"MAND {agent.mandate_turns}t", fonts["xs"], BAILC, cx, by+BK_H+84)
 
 
 def draw_right_panel(surf, agents, player, ep, step, event_log, liq_hist, fonts):
     x, w = RP_X, RP_W
-    rr(surf, PANEL, (x, TOP_H, w, H-TOP_H-4), 10)
-    y = TOP_H + 10
+    rr(surf, PANEL, (x, TOP_H, w, H-TOP_H-4), 8)
+    y = TOP_H + 14
 
-    tx(surf, "GAME THEORY ENGINE", fonts["md"], ACCENT, x+w//2, y+12)
-    pygame.draw.line(surf, (28,38,68), (x+8,y+26), (x+w-8,y+26), 1)
-    y += 32
+    def _heading(lbl, yy):
+        tx(surf, lbl, fonts["xs"], DIM, x+12, yy, anchor="topleft")
+        pygame.draw.line(surf, HAIR, (x+12, yy+14), (x+w-12, yy+14), 1)
+        return yy + 22
 
+    y = _heading("HEALTH TREND", y)
     if len(player.health_log) > 2:
-        sh, bw = 36, w-20
-        rr(surf, PANEL2, (x+8, y, bw, sh), 6)
+        sh, bw = 34, w-24
         recent = player.health_log[-60:]
         if len(recent) > 1:
             mx2,mn2 = max(recent),min(recent)
             sp2 = max(mx2-mn2,1)
-            pts = [(x+10+int(i/max(len(recent)-1,1)*(bw-4)),
+            pts = [(x+12+int(i/max(len(recent)-1,1)*(bw-4)),
                     y+sh-4-int((v-mn2)/sp2*(sh-8)))
                    for i,v in enumerate(recent)]
             if len(pts)>1: pygame.draw.lines(surf, lc(ILLIQ,GOOD,player.health/100), False, pts, 2)
-        tx(surf, "Health Trend", fonts["xs"], DIM, x+w//2, y+sh+8)
-        y += sh+16
+        y += sh + 10
+    else:
+        y += 10
 
-    tx(surf, "STRATEGY MATRIX", fonts["sm"], TEXT, x+w//2, y+8)
-    pygame.draw.line(surf, (28,38,68), (x+8,y+20), (x+w-8,y+20), 1)
-    y += 26
-
+    y = _heading("STRATEGY MATRIX", y)
     for i, ag in enumerate(agents):
-        ay = y + i*37
-        rr(surf, PANEL2, (x+8, ay, w-16, 29), 5)
+        ay = y + i*28
         sc = STRAT_COLORS[ag.last_action]
-        rr(surf, sc, (x+12, ay+5, 50, 19), 9)
-        tx(surf, ACTION_LABELS[ag.last_action][:3], fonts["xs"], BG, x+12+25, ay+14)
+        # Left accent strip
+        pygame.draw.rect(surf, sc, (x+12, ay+3, 3, 20))
+        # Action tag
+        tx(surf, ACTION_LABELS[ag.last_action][:4], fonts["xs"], sc, x+22, ay+13, anchor="midleft")
+        # Name
         nm_c = GOLD if player.selected==i else TEXT
-        tx(surf, BANK_NAMES[i][:6], fonts["xs"], nm_c, x+68, ay+14, anchor="midleft")
-        bw2 = w-160-16
+        tx(surf, BANK_NAMES[i][:8], fonts["xs"], nm_c, x+66, ay+13, anchor="midleft")
+        # Coop bar
+        bw2 = w-170
         coop = ag.coop_score
-        rr(surf, (20,32,58), (x+112, ay+9, bw2,12), 5)
-        rr(surf, lc(ILLIQ,LIQ,coop), (x+112, ay+9, int(bw2*coop),12), 5)
+        rr(surf, BG, (x+128, ay+9, bw2, 8), 2)
+        rr(surf, lc(ILLIQ,LIQ,coop), (x+128, ay+9, int(bw2*coop), 8), 2)
+        # Reward
         rw = ag.avg_reward
-        tx(surf, f"{rw:+.1f}", fonts["xs"], LIQ if rw>=0 else ILLIQ, x+w-8, ay+14, anchor="midright")
+        tx(surf, f"{rw:+.1f}", fonts["xs"], LIQ if rw>=0 else ILLIQ, x+w-12, ay+13, anchor="midright")
         if ag.mandate_turns > 0:
-            pygame.draw.rect(surf,(100,180,255),(x+8,ay,w-16,29),1,border_radius=5)
-    y += NUM_AGENTS*37 + 6
+            pygame.draw.rect(surf, BAILC, (x+12, ay+2, 3, 22))
+    y += NUM_AGENTS*28 + 8
 
-    tx(surf, "SYSTEM METRICS", fonts["sm"], TEXT, x+w//2, y+8)
-    pygame.draw.line(surf, (28,38,68), (x+8,y+20), (x+w-8,y+20), 1)
-    y += 28
-
+    # System metrics
+    y = _heading("SYSTEM METRICS", y)
     acts   = [a.last_action for a in agents]
     dom    = max(set(acts), key=acts.count)
     coop_s = sum(a.coop_score for a in agents)/NUM_AGENTS
@@ -498,58 +518,53 @@ def draw_right_panel(surf, agents, player, ep, step, event_log, liq_hist, fonts)
     pd_t   = (1-coop_s)*risk
 
     mets = [
-        ("Dominant Strat",  ACTION_LABELS[dom],          STRAT_COLORS[dom]),
-        ("Sys Cooperation", f"{coop_s*100:.0f}%",        lc(ILLIQ,LIQ,coop_s)),
-        ("Nash Deviation",  f"{nash_d*100:.0f}%",        lc(LIQ,ILLIQ,nash_d)),
-        ("Contagion Risk",  f"{risk*100:.0f}%",          lc(LIQ,ILLIQ,risk)),
-        ("PD Tension",      f"{pd_t*100:.0f}%",          lc(GOOD,ILLIQ,pd_t)),
+        ("Dominant",       ACTION_LABELS[dom],      STRAT_COLORS[dom]),
+        ("Cooperation",    f"{coop_s*100:.0f}%",    lc(ILLIQ,LIQ,coop_s)),
+        ("Nash Deviation", f"{nash_d*100:.0f}%",    lc(LIQ,ILLIQ,nash_d)),
+        ("Contagion Risk", f"{risk*100:.0f}%",      lc(LIQ,ILLIQ,risk)),
+        ("PD Tension",     f"{pd_t*100:.0f}%",      lc(GOOD,ILLIQ,pd_t)),
     ]
     for label, val, vc in mets:
-        rr(surf, PANEL2, (x+8, y, w-16, 24), 4)
-        tx(surf, label, fonts["xs"], DIM,  x+14, y+12, anchor="midleft")
-        tx(surf, val,   fonts["xs"], vc,   x+w-12, y+12, anchor="midright")
-        y += 28
-
-    if coop_s < 0.18:
-        rr(surf,(50,28,8),(x+8,y,w-16,22),5)
-        pygame.draw.rect(surf,WARN,(x+8,y,w-16,22),1,border_radius=5)
-        tx(surf,"TRAGEDY OF THE COMMONS",fonts["xs"],WARN,x+w//2,y+11)
-        y += 26
-    elif risk > 0.72:
-        rr(surf,(50,12,12),(x+8,y,w-16,22),5)
-        pygame.draw.rect(surf,ILLIQ,(x+8,y,w-16,22),1,border_radius=5)
-        tx(surf,"SYSTEMIC CRISIS IMMINENT",fonts["xs"],ILLIQ,x+w//2,y+11)
-        y += 26
-    elif nash_d < 0.1 and coop_s > 0.55:
-        rr(surf,(12,42,22),(x+8,y,w-16,22),5)
-        pygame.draw.rect(surf,GOOD,(x+8,y,w-16,22),1,border_radius=5)
-        tx(surf,"NASH EQ: COOPERATING",fonts["xs"],GOOD,x+w//2,y+11)
-        y += 26
-
+        tx(surf, label, fonts["xs"], DIM, x+14, y+10, anchor="midleft")
+        tx(surf, val,   fonts["xs"], vc,  x+w-14, y+10, anchor="midright")
+        y += 20
     y += 4
-    tx(surf,"EVENT LOG",fonts["sm"],TEXT,x+w//2,y+8)
-    pygame.draw.line(surf,(28,38,68),(x+8,y+20),(x+w-8,y+20),1)
-    y += 26
 
+    # Regime banner - single line, no box
+    banner = None
+    if coop_s < 0.18:
+        banner = ("TRAGEDY OF THE COMMONS", WARN)
+    elif risk > 0.72:
+        banner = ("SYSTEMIC CRISIS IMMINENT", ILLIQ)
+    elif nash_d < 0.1 and coop_s > 0.55:
+        banner = ("NASH EQ: COOPERATING", GOOD)
+    if banner:
+        rr(surf, (*banner[1], 30), (x+12, y, w-24, 22), 4)
+        tx(surf, banner[0], fonts["xs"], banner[1], x+w//2, y+11)
+        y += 28
+    else:
+        y += 4
+
+    y = _heading("EVENT LOG", y)
     for ev in event_log[-5:]:
-        rr(surf,PANEL2,(x+8,y,w-16,20),3)
-        tx(surf,ev["msg"][:34],fonts["xs"],ev.get("color",DIM),x+14,y+10,anchor="midleft")
-        y += 23
+        tx(surf, ev["msg"][:38], fonts["xs"], ev.get("color",DIM), x+14, y+8, anchor="midleft")
+        y += 18
 
     remaining = (H-8) - y - 24
     if len(liq_hist) > 3 and remaining > 52:
-        sh2 = min(remaining-18, 58)
-        rr(surf,PANEL2,(x+8,y+6,w-16,sh2),6)
+        y += 6
+        sh2 = min(remaining-18, 56)
+        tx(surf, "LIQUIDITY TREND", fonts["xs"], DIM, x+12, y, anchor="topleft")
+        y += 14
         recent2 = liq_hist[-60:]
         if len(recent2)>1:
             mx3,mn3 = max(recent2),min(recent2)
             sp3 = max(mx3-mn3,1)
             bw3 = w-24
             pts2 = [(x+12+int(i/max(len(recent2)-1,1)*(bw3-4)),
-                     y+6+sh2-4-int((v-mn3)/sp3*(sh2-8)))
+                     y+sh2-4-int((v-mn3)/sp3*(sh2-8)))
                     for i,v in enumerate(recent2)]
-            if len(pts2)>1: pygame.draw.lines(surf,ACC2,False,pts2,1)
-        tx(surf,"Liq Trend",fonts["xs"],DIM,x+w//2,y+sh2+14)
+            if len(pts2)>1: pygame.draw.lines(surf, ACC2, False, pts2, 1)
 
 
 def draw_overlay(surf, title, subtitle, stats, hint, title_clr, border_clr, fonts):
@@ -659,10 +674,10 @@ REGIME_EXPL = {
 
 
 def draw_nash_chart(surf, nash_hist, fonts, x, y, w, h):
-    rr(surf, PANEL, (x, y, w, h), 10)
-    pygame.draw.rect(surf, (28,38,68), (x, y, w, h), 1, border_radius=10)
-    tx(surf, "NASH EQUILIBRIUM TRAJECTORY", fonts["md"], ACCENT, x+w//2, y+14)
-    pygame.draw.line(surf, (28,38,68), (x+10, y+28), (x+w-10, y+28), 1)
+    rr(surf, PANEL, (x, y, w, h), 8)
+    tx(surf, "NASH EQUILIBRIUM TRAJECTORY", fonts["sm"], TEXT, x+14, y+14, anchor="midleft")
+    tx(surf, "Applied Game Theory  ::  Repeated N-Player Prisoner's Dilemma", fonts["xs"], DIM, x+w-14, y+14, anchor="midright")
+    pygame.draw.line(surf, HAIR, (x+10, y+28), (x+w-10, y+28), 1)
 
     pad_l, pad_r, pad_t, pad_b = 44, 170, 36, 32
     cx0 = x + pad_l
@@ -1035,22 +1050,13 @@ def run():
                           bail_window = bail_window,
                           fonts=fonts)
 
-        if len(liq_hist)>3:
-            sx,sy,sw,sh2=207,BK_TOP+BK_H+82,720,40
-            rr(screen,PANEL,(sx-6,sy-14,sw+12,sh2+20),8)
-            tx(screen,"SYSTEM LIQUIDITY TREND",fonts["xs"],DIM,sx+sw//2,sy-6)
-            recent3=liq_hist[-80:]
-            if len(recent3)>1:
-                m3,n3=max(recent3),min(recent3); s3=max(m3-n3,1)
-                pts3=[(sx+int(i/max(len(recent3)-1,1)*sw),sy+sh2-int((v-n3)/s3*sh2)) for i,v in enumerate(recent3)]
-                pygame.draw.lines(screen,ACC2,False,pts3,1)
-
-        lx=210
+        # Legend strip along the bottom
+        lx = 210
         for clr,lbl in [(LIQ,"Liquid"),(ILLIQ,"Illiquid"),(GOLD,"Selected"),(SHOKC,"Shock"),(BAILC,"Bailout")]:
-            pygame.draw.rect(screen,clr,(lx,H-18,10,10),border_radius=2)
-            tx(screen,lbl,fonts["xs"],DIM,lx+12,H-13,anchor="midleft"); lx+=80
+            pygame.draw.rect(screen, clr, (lx, H-16, 8, 8), border_radius=2)
+            tx(screen, lbl, fonts["xs"], DIM, lx+14, H-12, anchor="midleft"); lx += 76
 
-        nc_x, nc_y, nc_w, nc_h = 207, BK_TOP+BK_H+132, 720, 260
+        nc_x, nc_y, nc_w, nc_h = 207, BK_TOP+BK_H+98, 720, 290
         draw_nash_chart(screen, nash_hist, fonts, nc_x, nc_y, nc_w, nc_h)
 
         draw_top_hud(screen,player,episode,step,speed_idx,fonts)
