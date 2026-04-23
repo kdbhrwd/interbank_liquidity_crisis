@@ -633,10 +633,129 @@ def apply_tool(key, player, agents, ripples, flow_dots, event_log, shock_target_
         log(f"STRESS TEST: {BANK_NAMES[sel]} -{amt}", SHOKC)
 
 
+def classify_regime(coop, nash_dev, risk):
+    if risk > 0.72 and coop < 0.35:
+        return "CRISIS"
+    if coop < 0.18:
+        return "TRAGEDY"
+    if coop > 0.55 and nash_dev < 0.10:
+        return "NASH-COOP"
+    return "MIXED"
+
+
+REGIME_CLR = {
+    "NASH-COOP": GOOD,
+    "TRAGEDY":   ILLIQ,
+    "CRISIS":    ILLIQ,
+    "MIXED":     WARN,
+}
+
+REGIME_EXPL = {
+    "NASH-COOP": "Cooperative Nash eq reached: banks sustain liquidity (folk-theorem outcome).",
+    "TRAGEDY":   "Tragedy of the commons: defection (HOARD) dominates, system fragile.",
+    "CRISIS":    "Systemic crisis: low liquidity + high contagion risk. Intervene now.",
+    "MIXED":     "No stable equilibrium yet - agents still exploring strategies.",
+}
+
+
+def draw_nash_chart(surf, nash_hist, fonts, x, y, w, h):
+    rr(surf, PANEL, (x, y, w, h), 10)
+    pygame.draw.rect(surf, (28,38,68), (x, y, w, h), 1, border_radius=10)
+    tx(surf, "NASH EQUILIBRIUM TRAJECTORY", fonts["md"], ACCENT, x+w//2, y+14)
+    pygame.draw.line(surf, (28,38,68), (x+10, y+28), (x+w-10, y+28), 1)
+
+    pad_l, pad_r, pad_t, pad_b = 44, 170, 36, 32
+    cx0 = x + pad_l
+    cy0 = y + pad_t
+    cw  = w - pad_l - pad_r
+    ch  = h - pad_t - pad_b
+
+    rr(surf, PANEL2, (cx0, cy0, cw, ch), 4)
+
+    # Green tint: coop >= 0.55 (cooperative Nash eq zone)
+    zt = cy0 + ch - int(0.55 * ch)
+    s1 = pygame.Surface((cw, zt - cy0), pygame.SRCALPHA)
+    s1.fill((50, 200, 120, 22))
+    surf.blit(s1, (cx0, cy0))
+    # Red tint: coop <= 0.18 (tragedy zone)
+    tt = cy0 + ch - int(0.18 * ch)
+    s2 = pygame.Surface((cw, (cy0+ch) - tt), pygame.SRCALPHA)
+    s2.fill((220, 60, 90, 22))
+    surf.blit(s2, (cx0, tt))
+
+    # Threshold dashed lines
+    for frac, clr in [(0.55, GOOD), (0.18, ILLIQ), (0.10, ACC2)]:
+        gy = cy0 + ch - int(frac * ch)
+        for dx in range(0, cw, 8):
+            pygame.draw.line(surf, clr, (cx0+dx, gy), (cx0+dx+4, gy), 1)
+
+    for frac, lbl in [(0.0,"0%"),(0.25,"25%"),(0.5,"50%"),(0.75,"75%"),(1.0,"100%")]:
+        gy = cy0 + ch - int(frac * ch)
+        pygame.draw.line(surf, (30,42,74), (cx0, gy), (cx0+cw, gy), 1)
+        tx(surf, lbl, fonts["xs"], DIM, cx0-6, gy, anchor="midright")
+
+    if len(nash_hist) >= 2:
+        recent = nash_hist[-160:]
+        n = len(recent)
+        pts_coop, pts_dev = [], []
+        for i, m in enumerate(recent):
+            px = cx0 + int(i/(n-1) * cw)
+            pts_coop.append((px, cy0 + ch - int(max(0,min(1,m["coop"])) * ch)))
+            pts_dev.append( (px, cy0 + ch - int(max(0,min(1,m["nash_dev"])) * ch)))
+        pygame.draw.lines(surf, LIQ,   False, pts_coop, 2)
+        pygame.draw.lines(surf, ILLIQ, False, pts_dev,  2)
+        pygame.draw.circle(surf, GOLD, pts_coop[-1], 4)
+        pygame.draw.circle(surf, GOLD, pts_dev[-1],  4, 1)
+    else:
+        tx(surf, "collecting data...", fonts["xs"], DIM, cx0+cw//2, cy0+ch//2)
+
+    tx(surf, f"last {min(len(nash_hist),160)} steps  --->", fonts["xs"], DIM, cx0+cw//2, cy0+ch+12)
+
+    lx = cx0 + cw + 14
+    ly = cy0
+
+    pygame.draw.line(surf, LIQ, (lx, ly+6), (lx+22, ly+6), 2)
+    tx(surf, "Cooperation",    fonts["xs"], LIQ,   lx+28, ly+6, anchor="midleft")
+    ly += 16
+    pygame.draw.line(surf, ILLIQ, (lx, ly+6), (lx+22, ly+6), 2)
+    tx(surf, "Nash Deviation", fonts["xs"], ILLIQ, lx+28, ly+6, anchor="midleft")
+    ly += 20
+
+    pygame.draw.rect(surf, (50,200,120), (lx, ly, 14, 10))
+    tx(surf, "Coop Nash Zone", fonts["xs"], GOOD,  lx+18, ly+5, anchor="midleft")
+    ly += 14
+    pygame.draw.rect(surf, (220,60,90),  (lx, ly, 14, 10))
+    tx(surf, "Tragedy Zone",   fonts["xs"], ILLIQ, lx+18, ly+5, anchor="midleft")
+    ly += 18
+
+    cur = nash_hist[-1] if nash_hist else None
+    regime = cur["regime"] if cur else "MIXED"
+    rc = REGIME_CLR.get(regime, DIM)
+    tx(surf, "CURRENT REGIME", fonts["xs"], DIM, lx, ly, anchor="topleft")
+    ly += 14
+    rr(surf, PANEL2, (lx, ly, 148, 24), 5)
+    pygame.draw.rect(surf, rc, (lx, ly, 148, 24), 1, border_radius=5)
+    tx(surf, regime, fonts["sm"], rc, lx+74, ly+12)
+    ly += 30
+    if cur:
+        tx(surf, f"Coop:     {cur['coop']*100:5.0f}%",     fonts["xs"], LIQ,   lx, ly, anchor="topleft"); ly += 13
+        tx(surf, f"Dev:      {cur['nash_dev']*100:5.0f}%", fonts["xs"], ILLIQ, lx, ly, anchor="topleft"); ly += 13
+        tx(surf, f"Risk:     {cur['risk']*100:5.0f}%",     fonts["xs"], WARN,  lx, ly, anchor="topleft")
+
+    msg = REGIME_EXPL.get(regime, "")
+    tx(surf, msg, fonts["xs"], TEXT, x+w//2, y+h-14)
+
+
 def run():
     pygame.init()
-    screen = pygame.display.set_mode((W,H))
-    pygame.display.set_caption("Interbank Liquidity Crisis — Central Bank Command")
+    info = pygame.display.Info()
+    avail_w = max(640, info.current_w - 80)
+    avail_h = max(480, info.current_h - 120)
+    scale = min(1.0, avail_w / W, avail_h / H)
+    win_w, win_h = int(W * scale), int(H * scale)
+    window = pygame.display.set_mode((win_w, win_h))
+    pygame.display.set_caption("Interbank Liquidity Crisis - Central Bank Command")
+    screen = pygame.Surface((W, H)) if scale < 1.0 else window
     clock = pygame.time.Clock()
 
     fonts = {
@@ -659,6 +778,7 @@ def run():
     ep_history  = []
     event_log   = []
     liq_hist    = []
+    nash_hist   = []
     ripples     = []
     flow_dots   = []
     disp_liq    = [a.liquid for a in agents]
@@ -757,7 +877,8 @@ def run():
         clock.tick(FPS)
         now=pygame.time.get_ticks()
         ms =STEP_MS[speed_idx]
-        mx2,my2=pygame.mouse.get_pos()
+        _rmx,_rmy=pygame.mouse.get_pos()
+        mx2,my2=(int(_rmx/scale), int(_rmy/scale)) if scale<1.0 else (_rmx,_rmy)
 
         hov_tool=-1
         for ti,(rect,_) in enumerate(tool_rects):
@@ -773,7 +894,7 @@ def run():
                     if ev.key==pygame.K_RETURN:
                         agents,player=new_game()
                         episode=step=0; ep_history.clear(); event_log.clear()
-                        liq_hist.clear(); ripples.clear(); flow_dots.clear()
+                        liq_hist.clear(); nash_hist.clear(); ripples.clear(); flow_dots.clear()
                         disp_liq=[a.liquid for a in agents]; active_agt=-1
                         shock_ref=[-1]; shock_flash=0
                         phase="AGENT_TURN"; agent_idx=0; phase_start=now
@@ -843,6 +964,17 @@ def run():
                 if now-phase_start>=int(ms*0.15):
                     liq_hist.append(sum(a.liquid for a in agents))
                     if len(liq_hist)>200: liq_hist.pop(0)
+                    _acts = [a.last_action for a in agents]
+                    _dom  = max(set(_acts), key=_acts.count)
+                    _coop = sum(a.coop_score for a in agents)/NUM_AGENTS
+                    _ndev = sum(1 for a in _acts if a!=_dom)/NUM_AGENTS
+                    _totl = sum(a.liquid for a in agents)
+                    _risk = 1.0 - min(_totl/(NUM_AGENTS*45), 1.0)
+                    nash_hist.append({
+                        "coop": _coop, "nash_dev": _ndev, "risk": _risk,
+                        "regime": classify_regime(_coop, _ndev, _risk),
+                    })
+                    if len(nash_hist)>400: nash_hist.pop(0)
                     if step>=STEPS_PER_EP:
                         ep_history.append({"episode":episode,"total_liquid":sum(a.liquid for a in agents),
                                            "fed_rate":player.fed_rate,"health":player.health})
@@ -918,6 +1050,9 @@ def run():
             pygame.draw.rect(screen,clr,(lx,H-18,10,10),border_radius=2)
             tx(screen,lbl,fonts["xs"],DIM,lx+12,H-13,anchor="midleft"); lx+=80
 
+        nc_x, nc_y, nc_w, nc_h = 207, BK_TOP+BK_H+132, 720, 260
+        draw_nash_chart(screen, nash_hist, fonts, nc_x, nc_y, nc_w, nc_h)
+
         draw_top_hud(screen,player,episode,step,speed_idx,fonts)
         draw_left_panel(screen,player,agents,tool_rects,hov_tool,fonts)
         draw_right_panel(screen,agents,player,episode,step,event_log,liq_hist,fonts)
@@ -947,6 +1082,8 @@ def run():
                 "Press ENTER to play again  |  ESC to quit",
                 GOOD,GOOD,fonts)
 
+        if scale < 1.0:
+            pygame.transform.smoothscale(screen, (win_w, win_h), window)
         pygame.display.flip()
 
     pygame.quit()
