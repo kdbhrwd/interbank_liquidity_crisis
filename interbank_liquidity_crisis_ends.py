@@ -48,6 +48,29 @@ GOOD    = (92,188,132)
 NETC    = (32,40,54)
 ACTIVE  = (160,156,210)
 
+ALGOS        = ["Q-LEARN", "FICT-PLAY"]
+CURRENT_ALGO = [0]  # mutable container so BankAgent.act() can read it
+FP_EPSILON   = 0.05  # small exploration for Fictitious Play
+
+
+def fp_payoff(a_i, opp_dist):
+    """Expected payoff of action a_i given empirical distribution over one opponent's actions.
+    Models interbank liquidity as a coordination game with systemic-crisis penalty:
+      - public good from system liquidity
+      - complementarity bonus (lending pays when others lend)
+      - private opportunity cost of holding liquid assets
+      - crisis penalty if aggregate liquidity falls below a threshold
+    """
+    pct_i = ACTION_PCT[a_i]
+    avg_o = sum(p * ACTION_PCT[j] for j, p in enumerate(opp_dist))
+    sys   = (pct_i + 4 * avg_o) / 5.0
+    public      = 1.5 * sys
+    complement  = 1.2 * pct_i * avg_o
+    private_cost= 0.8 * pct_i
+    crisis      = -2.0 if sys < 0.30 else 0.0
+    return public + complement - private_cost + crisis
+
+
 TOOLS = [
     dict(key="b", label="BAILOUT",      desc="Restore target bank",  cost=50, earn=0,  sel=True,  clr=BAILC,            kcode=pygame.K_b),
     dict(key="q", label="QE INJECT",    desc="Add +25 capital",      cost=35, earn=0,  sel=True,  clr=ACC2,             kcode=pygame.K_q),
@@ -66,6 +89,9 @@ class BankAgent:
         self.liquid   = INIT_CAPITAL * 0.5
         self.illiquid = INIT_CAPITAL * 0.5
         self.q = np.zeros((3,3,2,NUM_AGENTS))
+        # Fictitious Play: Dirichlet(1,1,1,1,1) prior over each opponent's actions.
+        # We aggregate opponents into one empirical distribution (symmetric FP).
+        self.opp_counts = np.ones(len(ACTION_PCT), dtype=float)
         self.last_action  = 2
         self.coop_log     = []
         self.reward_log   = []
@@ -73,6 +99,17 @@ class BankAgent:
         self.mandated_action = 3
         self.qe_bonus = 0.0
         self.bankrupt = False
+
+    @property
+    def opp_dist(self):
+        s = self.opp_counts.sum()
+        return self.opp_counts / s if s > 0 else np.ones(len(ACTION_PCT))/len(ACTION_PCT)
+
+    def observe_opponents(self, opp_actions):
+        """Increment empirical counts with the actions just played by opponents."""
+        for a in opp_actions:
+            if 0 <= a < len(self.opp_counts):
+                self.opp_counts[a] += 1.0
 
     def tier(self, pct):
         return 0 if pct < 0.25 else (1 if pct < 0.75 else 2)
@@ -90,11 +127,28 @@ class BankAgent:
         if self.bankrupt: return 0
         if self.mandate_turns > 0:
             self.mandate_turns -= 1
-            a = self.mandated_action
-        elif random.random() < EPSILON:
-            a = random.randint(0, NUM_AGENTS-1)
+            self.last_action = self.mandated_action
+            return self.last_action
+
+        algo = ALGOS[CURRENT_ALGO[0]]
+
+        if algo == "FICT-PLAY":
+            # Best-respond to the empirical distribution of opponents.
+            if random.random() < FP_EPSILON:
+                a = random.randint(0, len(ACTION_PCT)-1)
+            else:
+                dist = self.opp_dist
+                payoffs = [fp_payoff(ai, dist) for ai in range(len(ACTION_PCT))]
+                best = max(payoffs)
+                tied = [i for i,v in enumerate(payoffs) if abs(v-best) < 1e-9]
+                a = random.choice(tied)
         else:
-            a = int(np.argmax(self.q[s]))
+            # Standard epsilon-greedy Q-learning.
+            if random.random() < EPSILON:
+                a = random.randint(0, len(ACTION_PCT)-1)
+            else:
+                a = int(np.argmax(self.q[s]))
+
         self.last_action = a
         return a
 
@@ -112,7 +166,9 @@ class BankAgent:
         if len(self.coop_log) > 60: self.coop_log.pop(0)
 
     def learn(self, s, a, r, ns):
-        self.q[s][a] += ALPHA * (r + GAMMA * float(np.max(self.q[ns])) - self.q[s][a])
+        # Only update Q-table in Q-LEARN mode; FP uses opponent model instead.
+        if ALGOS[CURRENT_ALGO[0]] == "Q-LEARN":
+            self.q[s][a] += ALPHA * (r + GAMMA * float(np.max(self.q[ns])) - self.q[s][a])
         self.reward_log.append(r)
         if len(self.reward_log) > 60: self.reward_log.pop(0)
 
@@ -290,12 +346,15 @@ def draw_top_hud(surf, player, ep, step, speed_idx, fonts):
     col_c = ILLIQ if player.collapses else DIM
     tx(surf, f"Collapses {player.collapses}", fonts["xs"], col_c, ex+ew-14, 52, anchor="midright")
 
-    # ---- Interventions ------------------------------------------------------
+    # ---- Algorithm + Interventions ------------------------------------------
     ix = ex+ew
     if ix+140 < W-RP_W-10:
-        _section(ix, W-RP_W-ix-4, "INTERVENTIONS")
-        tx(surf, str(player.interventions), fonts["md"], BAILC, ix+12, 46, anchor="midleft")
-        tx(surf, "[1-5] select bank", fonts["xs"], DIM, ix+60, 46, anchor="midleft")
+        iw = W-RP_W-ix-4
+        _section(ix, iw, "LEARNING ALGO   [A]")
+        algo_name = ALGOS[CURRENT_ALGO[0]]
+        algo_clr  = ACCENT if algo_name == "Q-LEARN" else GOLD
+        tx(surf, algo_name, fonts["sm"], algo_clr, ix+12, 40, anchor="midleft")
+        tx(surf, f"Interventions {player.interventions}", fonts["xs"], BAILC, ix+12, 58, anchor="midleft")
 
 
 def draw_left_panel(surf, player, agents, tool_rects, hovered_tool, fonts):
@@ -377,7 +436,7 @@ def draw_left_panel(surf, player, agents, tool_rects, hovered_tool, fonts):
 
     tx(surf, "CONTROLS", fonts["xs"], DIM, x, y, anchor="topleft")
     y += 16
-    for line in ["↑ / ↓     speed", "space     pause", "1 - 5     select", "esc       quit"]:
+    for line in ["↑ / ↓     speed", "space     pause", "1 - 5     select", "A         algo swap", "esc       quit"]:
         tx(surf, line, fonts["xs"], DIM, x, y, anchor="topleft")
         y += 14
 
@@ -886,6 +945,9 @@ def run():
         for i,a in enumerate(agents):
             if not a.bankrupt and states[i] is not None and ns[i] is not None:
                 a.learn(states[i],actions[i],rewards[i],ns[i])
+            # Update Fictitious Play opponent models for every agent.
+            opp_acts = [actions[j] for j in range(NUM_AGENTS) if j != i and actions[j] is not None]
+            a.observe_opponents(opp_acts)
 
     running=True
     while running:
@@ -923,6 +985,12 @@ def run():
                 if ev.key==pygame.K_SPACE:  paused=not paused
                 if ev.key==pygame.K_UP:     speed_idx=min(speed_idx+1,5)
                 if ev.key==pygame.K_DOWN:   speed_idx=max(speed_idx-1,0)
+                if ev.key==pygame.K_a:
+                    CURRENT_ALGO[0] = (CURRENT_ALGO[0] + 1) % len(ALGOS)
+                    # Reset opponent models so FP starts from a uniform prior.
+                    for _ag in agents:
+                        _ag.opp_counts = np.ones(len(ACTION_PCT), dtype=float)
+                    log(f"LEARNING ALGO: {ALGOS[CURRENT_ALGO[0]]}", ACCENT)
                 for i,k in enumerate([pygame.K_1,pygame.K_2,pygame.K_3,pygame.K_4,pygame.K_5]):
                     if ev.key==k:
                         player.selected= i if player.selected!=i else -1
